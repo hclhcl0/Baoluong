@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { generateSalaryEmail } from "@/utils/emailTemplate";
+import TaxTab from "@/components/TaxTab";
 import type { SalaryRecord, GmailAccount, SendResult, SendStatus } from "@/types/salary";
 
 interface AccountUI extends GmailAccount { showPass: boolean }
@@ -34,6 +35,7 @@ const fmt = (v: number | string) => {
 };
 
 export default function HomePage() {
+  const [activeTab, setActiveTab] = useState<"salary" | "tax">("salary");
   const fileRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -207,7 +209,7 @@ export default function HomePage() {
               <img src="https://ksbtdanang.vn/assets/images/logo.png" alt="CDC Logo" className="w-10 h-10 object-contain" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">Hệ Thống Gửi Báo Lương</h1>
+              <h1 className="text-xl font-bold text-white tracking-tight">Hệ Thống Gửi Báo Lương &amp; Thuế TNCN</h1>
               <p className="text-indigo-200 text-xs">Trung tâm Kiểm soát bệnh tật thành phố Đà Nẵng</p>
             </div>
           </div>
@@ -217,7 +219,7 @@ export default function HomePage() {
                 <Zap className="w-3 h-3" /> {accounts.length} tài khoản
               </Badge>
             )}
-            {records.length > 0 && (
+            {records.length > 0 && activeTab === "salary" && (
               <Badge variant="outline" className="border-white/30 text-white bg-white/10 text-xs">
                 <Users className="w-3 h-3" /> {records.length} nhân viên
               </Badge>
@@ -228,9 +230,36 @@ export default function HomePage() {
             </a>
           </div>
         </div>
+        {/* Tab Navigation */}
+        <div className="max-w-5xl mx-auto px-6 pb-0 flex gap-1">
+          <button
+            onClick={() => setActiveTab("salary")}
+            className={`px-5 py-2.5 text-sm font-semibold rounded-t-lg transition-all ${
+              activeTab === "salary"
+                ? "bg-white text-indigo-700 shadow-sm"
+                : "text-indigo-200 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            📊 Báo Lương Quý
+          </button>
+          <button
+            onClick={() => setActiveTab("tax")}
+            className={`px-5 py-2.5 text-sm font-semibold rounded-t-lg transition-all ${
+              activeTab === "tax"
+                ? "bg-white text-emerald-700 shadow-sm"
+                : "text-indigo-200 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            🧾 Báo Thuế TNCN
+          </button>
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+        {activeTab === "tax" && (
+          <TaxTab accounts={accounts} batchSize={batchSize} delayMs={delayMs} />
+        )}
+        {activeTab === "salary" && (<>
 
         {/* ── STEP 1: UPLOAD ── */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -562,6 +591,7 @@ export default function HomePage() {
             </div>
           </section>
         )}
+        </>)}
       </main>
 
       {/* Footer */}

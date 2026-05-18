@@ -69,3 +69,33 @@ export interface SendEmailsResponse {
   failed: number;
   results: SendResult[];
 }
+
+// ============================================================
+// Tax (Thuế TNCN) types
+// ============================================================
+
+export interface TaxRecord {
+  phong: string;          // Phòng/Khoa
+  tenNhanVien: string;
+  soTK: string;           // Số tài khoản
+  email: string;
+
+  // Các khoản thu nhập — tên cột thay đổi theo tháng nên lưu dạng mảng
+  khoans: { ten: string; soTien: number }[];
+
+  cong: number;           // Tổng cộng các khoản
+  bhxh: number;           // BHXH khấu trừ
+  giamTruGiaCanh: number; // Giảm trừ gia cảnh
+  thuNhapTinhThue: number; // Thu nhập tính thuế
+  thueTNCN: number;        // Thuế TNCN phải nộp
+
+  thang: string;           // Ví dụ: "04/2026"
+}
+
+export interface TaxSendResult {
+  tenNhanVien: string;
+  email: string;
+  status: SendStatus;
+  sentVia?: string;
+  error?: string;
+}
