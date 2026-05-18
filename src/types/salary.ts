@@ -99,3 +99,37 @@ export interface TaxSendResult {
   sentVia?: string;
   error?: string;
 }
+
+// ============================================================
+// Custom Excel Upload (chọn cột tùy chỉnh)
+// ============================================================
+
+/** Kết quả parse preview — trả về headers + vài dòng mẫu */
+export interface ExcelPreview {
+  headers: string[];                       // Tên cột từ file Excel
+  rows: Record<string, unknown>[];         // Tối đa 5 dòng preview
+  totalRows: number;                       // Tổng số dòng dữ liệu
+}
+
+/** Cấu hình ánh xạ cột mà người dùng chọn */
+export interface ColumnMapping {
+  nameCol: string;                                // Cột "Tên nhân viên" (bắt buộc)
+  emailCol: string;                               // Cột "Email" (bắt buộc)
+  displayCols: { key: string; label: string }[];  // Các cột hiển thị trong email
+  totalCol?: string;                              // Cột "Tổng thu nhập" (highlight đỏ)
+}
+
+/** Record linh hoạt sau khi ánh xạ cột */
+export interface CustomRecord {
+  tenNhanVien: string;
+  email: string;
+  data: Record<string, unknown>;  // key=header gốc, value=giá trị ô
+}
+
+export interface CustomSendResult {
+  tenNhanVien: string;
+  email: string;
+  status: SendStatus;
+  sentVia?: string;
+  error?: string;
+}

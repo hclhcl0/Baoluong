@@ -127,7 +127,7 @@ export function generateSalaryEmail(
       <tr>
         <td style="padding:24px 24px 8px 24px;">
           <p style="margin:0 0 16px 0;font-size:14px;color:#333333;">
-            Kính gửi: <strong>${data.tenNhanVien}</strong>
+            Kính gửi: Ông/Bà <strong>${data.tenNhanVien}</strong>
           </p>
           ${opts.customMessage ? `<div style="margin:0 0 16px 0;font-size:13px;color:#1e293b;line-height:1.6;background-color:#f1f5f9;padding:14px;border-left:4px solid ${blueHdr};border-radius:4px;">${opts.customMessage.replace(/\n/g, '<br/>')}</div>` : ''}
         </td>
