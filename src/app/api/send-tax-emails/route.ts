@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       enc(controller, { type: "start", total: records.length });
 
       for (let i = 0; i < records.length; i++) {
+        if (req.signal.aborted) break;
         const record = records[i];
         const account = pool.next();
         const transporter = transporters.get(account.id)!;

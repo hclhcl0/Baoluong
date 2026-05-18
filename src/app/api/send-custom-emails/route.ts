@@ -23,6 +23,7 @@ interface SendCustomBody {
   customMessage?: string;
   footerNote?: string;
   emailTitle?: string;
+  records: CustomRecord[];
 }
 
 function enc(controller: ReadableStreamDefaultController, data: object) {
@@ -44,80 +45,15 @@ export async function POST(req: NextRequest) {
     customMessage,
     footerNote,
     emailTitle,
+    records,
   } = body;
 
-  if (!fileBase64) return new Response("Không có dữ liệu file.", { status: 400 });
+  if (!records || !records.length) {
+    return new Response("Không có dữ liệu nhân viên để gửi.", { status: 400 });
+  }
   if (!accounts?.length) return new Response("Cần ít nhất 1 tài khoản Gmail.", { status: 400 });
   if (!columnMapping?.nameCol || !columnMapping?.emailCol) {
     return new Response("Thiếu cột tên hoặc email.", { status: 400 });
-  }
-
-  // Decode base64 → ArrayBuffer → parse Excel
-  const binaryStr = atob(fileBase64);
-  const bytes = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-  
-  const workbook = XLSX.read(bytes, { type: "array" });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const allRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
-
-  const topRow = (allRows[headerRowIndex] as unknown[] || []).map(h => String(h || "").trim());
-  const nextRow = (allRows[headerRowIndex + 1] as unknown[] || []).map(h => String(h || "").trim());
-
-  let actualIsSubHeader = isSubHeader || false;
-  if (isSubHeader === undefined) {
-    let currentTop = "";
-    const maxLen = Math.max(topRow.length, nextRow.length);
-    for (let i = 0; i < maxLen; i++) {
-      const t = topRow[i] || "";
-      const n = nextRow[i] || "";
-      if (t !== "") currentTop = t;
-      if (t === "" && currentTop !== "" && n !== "") {
-        actualIsSubHeader = true; break;
-      }
-    }
-  }
-
-  const headerMap: { index: number; name: string }[] = [];
-  let currentTop = "";
-  const maxLen = Math.max(topRow.length, nextRow.length);
-  for (let i = 0; i < maxLen; i++) {
-    const t = topRow[i] || "";
-    const n = nextRow[i] || "";
-    if (t !== "") currentTop = t;
-    let headerName = currentTop;
-    if (actualIsSubHeader && n !== "") {
-      if (currentTop && currentTop !== n) headerName = `${currentTop} - ${n}`;
-      else headerName = n;
-    }
-    if (headerName !== "" && !headerMap.some(h => h.name === headerName)) headerMap.push({ index: i, name: headerName });
-  }
-
-  const records: CustomRecord[] = [];
-  const dataStartIdx = headerRowIndex + (actualIsSubHeader ? 2 : 1);
-  for (let i = dataStartIdx; i < allRows.length; i++) {
-    const row = allRows[i] as unknown[];
-    const rowObj: Record<string, unknown> = {};
-    headerMap.forEach(({ index, name }) => { rowObj[name] = row[index] ?? ""; });
-
-    const name = String(rowObj[columnMapping.nameCol] || "").trim();
-    const email = String(rowObj[columnMapping.emailCol] || "").trim();
-
-    if (!name || !email || !email.includes("@")) continue;
-
-    const deptKeywords = ["phòng", "ban ", "khoa", "tổ ", "đội ", "tổng cộng", "cộng"];
-    if (deptKeywords.some((k) => name.toLowerCase().startsWith(k))) continue;
-
-    const data: Record<string, unknown> = {};
-    columnMapping.displayCols.forEach(({ key }) => { data[key] = rowObj[key]; });
-    if (columnMapping.totalCol) data[columnMapping.totalCol] = rowObj[columnMapping.totalCol];
-
-    records.push({ tenNhanVien: name, email, data });
-  }
-
-  if (!records.length) {
-    return new Response("Không tìm thấy nhân viên hợp lệ trong file.", { status: 400 });
   }
 
   const transporters = new Map<string, nodemailer.Transporter>();
@@ -136,6 +72,7 @@ export async function POST(req: NextRequest) {
       enc(controller, { type: "start", total: records.length });
 
       for (let i = 0; i < records.length; i++) {
+        if (req.signal.aborted) break;
         const record = records[i];
         const account = pool.next();
         const transporter = transporters.get(account.id)!;

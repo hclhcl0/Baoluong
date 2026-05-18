@@ -40,6 +40,7 @@ interface Props {
 export default function SalaryTab({ accounts, batchSize, delayMs }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const [records, setRecords] = useState<SalaryRecordUI[]>([]);
   const [filterStatus, setFilterStatus] = useState<"all" | "selected" | "success" | "error">("all");
@@ -100,10 +101,14 @@ export default function SalaryTab({ accounts, batchSize, delayMs }: Props) {
     // Reset status of records that are about to be sent
     setRecords(prev => prev.map(r => selectedRecords.some(sr => sr.id === r.id) ? { ...r, status: "idle", error: undefined } : r));
 
+    const ac = new AbortController();
+    abortControllerRef.current = ac;
+
     try {
       const res = await fetch("/api/send-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ac.signal,
         body: JSON.stringify({
           records: selectedRecords, accounts: accounts.map(({ id, user, appPassword }) => ({ id, user, appPassword })),
           subject, batchSize, batchDelayMs: delayMs, customMessage,
@@ -139,8 +144,17 @@ export default function SalaryTab({ accounts, batchSize, delayMs }: Props) {
           if (ev.type === "done") setIsDone(true);
         }
       }
-    } catch (e) { console.error(e); }
-    finally { setIsSending(false); }
+    } catch (e: any) {
+      if (e.name === "AbortError") {
+        console.log("Đã dừng gửi");
+        setRecords(prev => prev.map(r => r.status === "idle" && selectedRecords.some(s => s.id === r.id) ? { ...r, status: "idle" } : r));
+      } else {
+        console.error(e);
+      }
+    } finally {
+      setIsSending(false);
+      abortControllerRef.current = null;
+    }
   };
 
   const pct = prog.total ? Math.round((prog.sent / prog.total) * 100) : 0;
@@ -366,7 +380,14 @@ export default function SalaryTab({ accounts, batchSize, delayMs }: Props) {
                 {isDone ? "Hoàn tất!" : `Đang gửi... ${pct}%`}
               </h2>
             </div>
-            <span className="text-slate-400 text-sm">{prog.sent}/{prog.total}</span>
+            <div className="flex items-center gap-4 ml-auto">
+              {!isDone && isSending && (
+                <Button onClick={() => abortControllerRef.current?.abort()} variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50">
+                  Tạm dừng
+                </Button>
+              )}
+              <span className="text-slate-400 text-sm">{prog.sent}/{prog.total}</span>
+            </div>
           </div>
           <div className="p-6 space-y-4">
             <Progress value={pct} colorClass={isDone && prog.failed === 0 ? "bg-emerald-500" : "bg-indigo-600"} />

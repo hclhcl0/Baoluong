@@ -43,6 +43,7 @@ interface Props {
 export default function CustomSalaryTab({ accounts, batchSize, delayMs }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // File state
   const [fileBase64, setFileBase64] = useState<string>("");
@@ -178,11 +179,15 @@ export default function CustomSalaryTab({ accounts, batchSize, delayMs }: Props)
     
     setRecords(prev => prev.map(r => selected.some(s => s.id === r.id) ? { ...r, status:"idle", error:undefined } : r));
     
+    const ac = new AbortController();
+    abortControllerRef.current = ac;
+
     try {
       const emailTitle = subject || "Thông báo lương - CDC Đà Nẵng";
       const res = await fetch("/api/send-custom-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ac.signal,
         body: JSON.stringify({
           fileBase64, fileName, headerRowIndex, isSubHeader, columnMapping,
           records: selected, accounts: accounts.map(({ id, user, appPassword }) => ({ id, user, appPassword })),
@@ -209,8 +214,19 @@ export default function CustomSalaryTab({ accounts, batchSize, delayMs }: Props)
           if (ev.type === "done") setIsDone(true);
         }
       }
-    } catch (e) { console.error(e); }
-    finally { setIsSending(false); }
+    } catch (e: any) { 
+      if (e.name === "AbortError") {
+        console.log("Đã dừng gửi");
+        // Mark remaining as idle
+        setRecords(prev => prev.map(r => r.status === "idle" && selected.some(s => s.id === r.id) ? { ...r, status: "idle" } : r));
+      } else {
+        console.error(e); 
+      }
+    }
+    finally { 
+      setIsSending(false); 
+      abortControllerRef.current = null;
+    }
   };
 
   const filteredRecords = records.filter(r => {
@@ -511,7 +527,14 @@ export default function CustomSalaryTab({ accounts, batchSize, delayMs }: Props)
               {isDone ? <CheckCircle className="w-5 h-5 text-emerald-500" /> : <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />}
               <h2 className="font-semibold text-slate-800">{isDone ? "Hoàn tất!" : `Đang gửi... ${pct}%`}</h2>
             </div>
-            <span className="text-slate-400 text-sm">{prog.sent}/{prog.total}</span>
+            <div className="flex items-center gap-4 ml-auto">
+              {!isDone && isSending && (
+                <Button onClick={() => abortControllerRef.current?.abort()} variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50">
+                  Tạm dừng
+                </Button>
+              )}
+              <span className="text-slate-400 text-sm">{prog.sent}/{prog.total}</span>
+            </div>
           </div>
           <div className="p-6 space-y-4">
             <Progress value={pct} colorClass={isDone && prog.failed===0 ? "bg-emerald-500" : "bg-indigo-600"} />
